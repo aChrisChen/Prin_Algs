@@ -1,11 +1,13 @@
 import edu.princeton.cs.algs4.WeightedQuickUnionUF;
 
 public class Percolation {
-	private WeightedQuickUnionUF model;
-	private int sideLen;
-	private boolean[] stateOpen;
-	private int top;
-	private int bottom;
+  
+  private final WeightedQuickUnionUF modelT;
+  private final WeightedQuickUnionUF modelTB;
+  private final int sideLen;
+  private boolean[] stateOpen;
+  private final int top;
+  private final int bottom;
 	
 
 
@@ -14,75 +16,127 @@ public class Percolation {
    		if (n <= 0) {
    			throw new IllegalArgumentException();
    		}
-   		model = new WeightedQuickUnionUF(n*n + 2); // the last 2 position stands for top and bottom
+   		modelT = new WeightedQuickUnionUF(n*n + 1); // the last 2 position stands for top
+      modelTB = new WeightedQuickUnionUF(n*n + 2);
+      top = 0;
+      bottom = n*n + 1;
    		sideLen = n;
-   		stateOpen = new boolean[n*n];
-   		for(int i = 0; i < n*n; i++) {
-   			stateOpen[i] = false;
-   		}
-   		top = n*n;
-   		bottom = n*n + 1;
+   		
+      // default of boolean array is false
+      stateOpen = new boolean[n*n + 2];
+      stateOpen[top] = true;
+      stateOpen[bottom] = true;
    	}	
 
    	private int getLegalPos(int row, int col) {
-   		if(!((row >= 1) && (row <= sideLen) && (col >= 1) && (col <= sideLen))) {
-   			throw new IndexOutOfBoundsException();
+   		if (!((row >= 1) && (row <= sideLen) && (col >= 1) && (col <= sideLen))) {
+   			throw new IllegalArgumentException();
    		}
-   		return (row - 1) * sideLen + col - 1;
+   		return (row - 1) * sideLen + col;
    	}
 
-   	public    void open(int row, int col){
+    private void tryUnion(int rowA, int colA, int rowB, int colB) {
+      // assume rowA and colA are correct
+      if (rowB > 0 && rowB <= sideLen && colB > 0 && colB <=sideLen && isOpen(rowB, colB)) {
+        modelT.union(getLegalPos(rowA, colA), getLegalPos(rowB, colB));
+        modelTB.union(getLegalPos(rowA, colA), getLegalPos(rowB, colB));
+      }
+    }
+
+   	public void open(int row, int col) {
    		// open site (row, col) if it is not open already
    		int legalPos = getLegalPos(row, col);
    		stateOpen[legalPos] = true;
    		// open grid is at first line
-   		if (legalPos/sideLen == 0) {
-   			model.union(top, legalPos);
+   		if (row == 1) {
+   			modelT.union(top, legalPos);
+        modelTB.union(top, legalPos);
    		}
-   		// open grid is at last line
-   		if ((legalPos/sideLen == sideLen - 1) || (legalPos/sideLen == sideLen)) {
-   			model.union(legalPos, bottom);
+   		// open grisopenid is at last line
+   		if (row == sideLen) {
+   			modelTB.union(legalPos, bottom);
    		}
 
    		// open grid is in the middle
-   		int[] neighbors = new int[] {legalPos - sideLen, legalPos + sideLen, legalPos - 1, legalPos + 1};
-   		for (int neighbor: neighbors) {
-   			if ((neighbor >= 0) && (neighbor < sideLen * sideLen) && stateOpen[neighbor]) {
-   				model.union(legalPos, neighbor);
-   			}
-   		}
+   		tryUnion(row, col, row - 1, col);
+      tryUnion(row, col, row + 1, col);
+      tryUnion(row, col, row, col - 1);
+      tryUnion(row, col, row, col + 1);
    	}    
 
-    public boolean isOpen(int row, int col){
+    public boolean isOpen(int row, int col) {
     	// is site (row, col) open?
-    	int legalPos = getLegalPos(row, col);
-    	return stateOpen[legalPos];
+    	return stateOpen[getLegalPos(row, col)];
     } 
 
-    public boolean isFull(int row, int col){
-    	return !isOpen(row, col);
+    public boolean isFull(int row, int col) {
+      // if we have a bottom index, then it is complicated to judge full for components connected to bottom 
+      return modelT.connected(top, getLegalPos(row, col));
     }
-    public     int numberOfOpenSites(){
+
+    public     int numberOfOpenSites() {
     	// number of open sites
-    	int count = 0;
-    	for (boolean state: stateOpen) {
-    		count += (state? 1 : 0);
-    	}
+      int count = 0;
+      for (int i = 1; i <= sideLen * sideLen; i++) {
+        count += (stateOpen[i] ? 1 : 0);
+      }
     	return count;
     }       
     public boolean percolates()	{
     	// does the system percolate?
-    	return model.connected(top, bottom);
+      return modelTB.connected(top, bottom);
     }              
+
+    private void printMap() {
+      for (int i = 0; i < sideLen; i++) {
+        for (int j = 0; j < sideLen; j++) {
+          int legalPos = getLegalPos(i+1, j+1);
+          if (stateOpen[legalPos]) {
+            System.out.print("1 " + isFull(i+1, j+1) + " ");
+          } else {
+            System.out.print("0 " + isFull(i+1, j+1) + " ");
+          }
+        }
+        System.out.println();
+      }
+      System.out.println("Connection to Top:");
+      for (int i = 0; i < sideLen; i++) {
+        for (int j = 0; j < sideLen; j++) {
+          int legalPos = getLegalPos(i+1, j+1);
+          if (stateOpen[legalPos]) {
+            System.out.print("1 " + modelT.connected(legalPos, top) + " ");
+          } else {
+            System.out.print("0 " + modelT.connected(legalPos, top) + " ");
+          }
+        }
+        System.out.println();
+      }
+    }
 
     public static void main(String[] args) {
     	System.out.println("*************");
-    	Percolation model = new Percolation(3);
-    	model.open(1,2);
-    	model.open(2,2);
-    	model.open(3,3);
-    	System.out.println(model.isFull(3,1));
-    	System.out.println(model.percolates());
+      int n = 6;
+    	Percolation test = new Percolation(n);
+    	test.open(1, 6);
+    	test.open(2, 6);
+      test.open(3, 6);
+    	test.open(4, 6);
+      test.open(5, 6);
+      test.open(5, 5);
+      test.open(4, 4);
+      test.open(3, 4);
+      test.open(2, 4);
+      test.open(2, 3);
+      test.open(2, 2);
+      test.open(2, 1);
+      test.open(3, 1);
+      test.open(4, 1);
+      test.open(5, 2);
+      test.open(6, 2);
+      test.open(5, 4);
+
+      test.printMap();
+      System.out.println(test.percolates());
 
 
     }
